@@ -1,8 +1,8 @@
 % Parameters
 Lx = 1; % interval length
 Ly = 1; % interval length
-Nx = 64; % Number of grid points in the x-direction
-Ny = 64; % Number of grid points in the y-direction
+Nx = 100; % Number of grid points in the x-direction
+Ny = 100; % Number of grid points in the y-direction
 dx = Lx / (Nx - 1); % Grid spacing in the x-direction
 dy = Ly / (Ny - 1); % Grid spacing in the y-direction
 
@@ -28,7 +28,7 @@ u = zeros(Ny, Nx);
 u(:, 1) = 0; % u(0, y) = 0
 u(1, :) = 0; % u(x, 0) = 0
 
-eplsilon = 1e-8;
+eplsilon = 1e-3;
 maxIterations = 10000;
 k = 0;
 
@@ -74,5 +74,3 @@ ylabel('y');
 zlabel('|u - u_{exact}|')
 title('Abs difference');
 view(3);
-
-
