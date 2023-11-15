@@ -1,25 +1,124 @@
 % ### SOLUTION ###
 
 [tri, x, y] = generateTriangularMesh(60);
-centroids = getTriangularMeshCentroids(tri, x, y);
+trimesh(tri, x, y); axis('equal');
 
-% Plot the triangulation
+% Set up parameters
+numNodes = numel(x);
+numTriangles = size(tri, 1);
+dt = 0.0005; % time step
+finalTime = 1; % final simulation time
+programLifeTime = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+
+% Initialize solution
+u = zeros(numNodes, 1);
+
+% Set initial condition inside the domain
+for i = 1:numNodes
+    u(i) = sin(pi * (x(i)^2 + y(i)^2)) * ((x(i) - 1)^2 + y(i)^2 - 9);
+end
+
+% Enforce boundary condition (u = 0 on the boundary)
+u = enforceBoundaryCondition(u, tri, x, y);
+
+% Velocity field
+v = [1, 2];
+
+% Create the initial figure
 figure;
-trimesh(tri, x, y, 'Color', 'b', 'LineWidth', 1.5); axis('equal')
-hold on;
-
-% Plot the centroids
-scatter(centroids(:, 1), centroids(:, 2), '.', 'r');
-hold off;
-
-% Customize plot
+h = trisurf(tri, x, y, u, 'EdgeColor', 'k', 'FaceColor', 'interp');
 xlabel('X-axis');
 ylabel('Y-axis');
-title('Triangulation with Centroids');
-legend('Triangulation', 'Centroids');
-grid on;
+zlabel('Solution (u)');
+title(['Numerical Solution at t = 0']);
+drawnow;
+
+% Time-stepping loop
+for t = dt:dt:finalTime
+    % Laplacian term
+    laplacian_u = computeLaplacian(tri, x, y, u);
+    
+    % Loop over triangles for FVM
+    for i = 1:numTriangles
+        nodes = tri(i, :);
+        
+        % Calculate face normals
+        normal = computeFaceNormals(x(nodes), y(nodes));
+        
+        % Compute flux term
+        flux = (v * normal') / norm(normal) * u(nodes);
+
+        
+        % Update solution using FVM
+        u(nodes) = u(nodes) + (dt / polyarea(x(nodes), y(nodes))) * (0.1 * laplacian_u(i) - flux);
+    end
+
+    % Enforce boundary condition (u = 0 on the boundary)
+    u = enforceBoundaryCondition(u, tri, x, y);
+
+    if ismember(t, finalTime * programLifeTime)
+        % Update the figure
+        set(h, 'Vertices', [x(:), y(:), u(:)]);
+        title(['Numerical Solution at t = ' num2str(t)]);
+        drawnow;
+    end
+end
 
 % ### HELPER FUNCTIONS ###
+
+function u = enforceBoundaryCondition(u, tri, x, y)
+    numNodes = numel(x);
+    numTriangles = size(tri, 1);
+
+    % Loop over triangles to identify boundary nodes
+    for i = 1:numTriangles
+        nodes = tri(i, :);
+        
+        % Identify nodes on the boundary
+        boundaryNodes = nodes(x(nodes).^2 + y(nodes).^2 == 1 | ...
+                               (x(nodes)-1).^2 + y(nodes).^2 == 9);
+        
+        % Set solution to zero on boundary nodes
+        u(boundaryNodes) = 0;
+    end
+end
+
+function laplacian_u = computeLaplacian(tri, x, y, u)
+    % Compute Laplacian of the solution at each triangle using linear shape functions
+    
+    numTriangles = size(tri, 1);
+    laplacian_u = zeros(numTriangles, 1);
+
+    for i = 1:numTriangles
+        nodes = tri(i, :);
+        area = polyarea(x(nodes), y(nodes));
+        
+        % Linear shape functions for the Laplacian
+        N1 = 1 / (2 * area) * (y(nodes(2)) - y(nodes(3)));
+        N2 = 1 / (2 * area) * (y(nodes(3)) - y(nodes(1)));
+        N3 = 1 / (2 * area) * (y(nodes(1)) - y(nodes(2)));
+        
+        % Calculate Laplacian using linear shape functions
+        laplacian_u(i) = N1 * u(nodes(1)) + N2 * u(nodes(2)) + N3 * u(nodes(3));
+    end
+end
+
+function faceNormals = computeFaceNormals(x, y)
+    % Compute outward-facing normal vectors for each face of a triangle
+    
+    numNodes = length(x);
+    faceNormals = zeros(numNodes, 2);
+
+    for i = 1:numNodes
+        j = mod(i, numNodes) + 1; % Next node in the sequence
+        dx = x(j) - x(i);
+        dy = y(j) - y(i);
+        
+        % Compute outward-facing normal vector
+        faceNormals(i, :) = [-dy, dx] / norm([dx, dy]);
+    end
+end
+
 
 function centroids = getTriangularMeshCentroids(tri, x, y)
 centroids = zeros(size(tri, 1), 2);
@@ -62,7 +161,7 @@ end
 counter = counter - 1;
 
 % Populate boundary nodes
-bnodes_out = 2.5*N;
+bnodes_out = 3 * N;
 for i = 1:bnodes_out
     h = 1 + 3 * cos(2 * pi / bnodes_out * i);
     v = 3 * sin(2 * pi / bnodes_out * i);
